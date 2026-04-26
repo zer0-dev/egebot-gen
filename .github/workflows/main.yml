@@ -1,0 +1,23 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy-prod:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to PROD
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_PROD_HOST }}
+          username: ${{ secrets.SSH_PROD_USER }}
+          key: ${{ secrets.SSH_PROD_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PROD_PORT }}
+          script: |
+            cd /var/www/api.xn--80aepjprhof.xn--p1ai/egebot-gen
+            bash ./deploy.sh
