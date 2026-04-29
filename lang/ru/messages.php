@@ -13,7 +13,7 @@ return [
         'reminder_success' => 'Рассылка напоминалки началась',
         'restock_needed' => "По следующим предметам осталось меньше 5 промокодов:\n:subjects",
         'upload_promocodes' => 'Генерируем промокоды для предмета :subject',
-        'upload_promocodes_fail' => 'Загрузите файл с перечисленными в нём промокодами',
+        'upload_promocodes_fail' => 'Введите количество генерируемых кодов',
         'upload_promocodes_select' => 'Выберите предмет, для которого будем генерировать промокоды',
         'upload_promocodes_start' => 'Начата загрузка промокодов в базу',
         'upload_promocodes_success' => 'Промокоды загружены в базу: :amount шт.',
