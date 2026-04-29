@@ -8,6 +8,8 @@ use App\Models\Order;
 use App\Models\Promocode;
 use App\Models\Subject;
 use App\Models\User;
+use DateTime;
+use DateTimeZone;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
@@ -337,7 +339,6 @@ class BotService
         }
 
         if(preg_match('/selectSubjectUpload\[(\d+)]/', $msg->getMessage(), $matches)){
-            $user->update(['state' => 1]);
             $subject = Subject::query()->find($matches[1]);
             $text = __('messages.admin.upload_promocodes', ['subject' => $subject->name]);
             $this->generatePromocodes(intval($matches[1]));
