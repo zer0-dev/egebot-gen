@@ -133,7 +133,7 @@ class BotService
                     $order->subjects()->attach($cart);
 
                     $paymentService = app()->make(PaymentService::class);
-                    $initPayment = $paymentService->init_payment($total, $subjects_list, "bot-$order->id");
+                    $initPayment = $paymentService->init_payment($total, $subjects_list, "bot3-$order->id");
                     if(!$initPayment['ok']){
                         $errorText = $initPayment['error'];
                         $text = __('messages.shop.acquiring_error', ['message' => $errorText]);
