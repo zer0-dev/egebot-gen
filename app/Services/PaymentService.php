@@ -39,7 +39,7 @@ class PaymentService
         $result = $check->json();
         if($result['Success']){
             $orderId = explode('-', $result['OrderId']);
-            if($result['TerminalKey'] === Config::get('services.payment.terminal_key') && $orderId[0] === 'bot'){
+            if($result['TerminalKey'] === Config::get('services.payment.terminal_key') && $orderId[0] === 'bot3'){
                 return ['ok' => true, 'status' => $result['Status'], 'order_id' => $orderId[1]];
             } else {
                 return ['ok' => false, 'error' => 'Wrong parameters for GetState'];
