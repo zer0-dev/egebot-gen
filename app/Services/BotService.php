@@ -27,7 +27,6 @@ class BotService
             fn(Message $msg) => $this->state3($msg),
             fn(Message $msg) => $this->state4($msg),
             fn(Message $msg) => $this->state5($msg),
-            fn(Message $msg) => $this->state6($msg),
         ];
     }
 
@@ -338,9 +337,10 @@ class BotService
         }
 
         if(preg_match('/selectSubjectUpload\[(\d+)]/', $msg->getMessage(), $matches)){
-            $user->update(['state' => 6, 'data' => $matches[1]]);
+            $user->update(['state' => 1]);
             $subject = Subject::query()->find($matches[1]);
             $text = __('messages.admin.upload_promocodes', ['subject' => $subject->name]);
+            $this->generatePromocodes(intval($matches[1]));
         } else {
             $user->update(['state' => 1]);
             $text = __('messages.admin.default_message');
@@ -402,32 +402,6 @@ class BotService
         $this->sendReminder($msg->getMessage());
     }
 
-    private function state6(Message $msg)
-    {
-        $user = $msg->getUser();
-        $keyboard = [];
-        $is_inline = false;
-        if($user->uid != Config::get('services.admin.id')){
-            $user->update(['state' => 0]);
-            $this->state0($msg);
-            return;
-        }
-
-        if($msg->getMessage() === __('messages.cancel')){
-            $user->update(['state' => 1]);
-            $this->botApi->send_message($user, __('messages.admin.default_message'), $keyboard, false, $msg->getCallbackQueryId());
-            return;
-        }
-
-        $text = $msg->getFileLink() !== null ? __('messages.admin.upload_promocodes_start') : __('messages.admin.upload_promocodes_fail');
-
-        $this->botApi->send_message($user, $text, $keyboard, $is_inline, $msg->getCallbackQueryId());
-        if($msg->getFileLink() !== null){
-            $user->update(['state' => 1]);
-            $this->uploadPromocodes($msg->getFileLink(), intval($user->data));
-        }
-    }
-
     private function sendEveryone(string $message){
         $users = User::query()->get();
         foreach ($users as $user){
@@ -435,11 +409,11 @@ class BotService
         }
     }
 
-    private function uploadPromocodes(?string $file_link, int $subject_id){
-        if($file_link === null){
-            return;
+    private function generatePromocodes(int $subject_id){
+        $codes = [];
+        for($i = 0; $i < 50; $i++){
+            $codes[] = $this->generate_promo($subject_id);
         }
-        $codes = explode("\n", file_get_contents($file_link));
 
         $data = [];
         $now = now();
@@ -498,5 +472,85 @@ class BotService
     private function sendMessageToAdmin(string $message){
         $admin_user = User::query()->where('uid', '=', Config::get('services.admin.id'))->where('type', '=', Config::get('services.admin.type'))->get()[0];
         $this->sendMessageToUser($admin_user, $message);
+    }
+
+    private function generate_promo(int $subject_id) {
+        $keys_for_items = [
+            [
+                "month_position" => -1,
+                "set_letter" => []
+            ],
+            [
+                "month_position" => 0,
+                "set_letter" => ['r','u','s']
+            ],
+            [
+                "month_position" => 1,
+                "set_letter" => ['m','a','t']
+            ],
+            [
+                "month_position" => 2,
+                "set_letter" => ['o','b','s']
+            ],
+            [
+                "month_position" => 1,
+                "set_letter" => ['r','u','s']
+            ],
+            [
+                "month_position" => 2,
+                "set_letter" => ['c','h','e']
+            ],
+            [
+                "month_position" => 1,
+                "set_letter" => ['b','i','o']
+            ],
+            [
+                "month_position" => 0,
+                "set_letter" => ['l','i','t']
+            ],
+            [
+                "month_position" => 2,
+                "set_letter" => ['s','b','o']
+            ],
+            [
+                "month_position" => 0,
+                "set_letter" => ['e','n','g']
+            ]
+        ];
+        // текущая дата
+        $now = new DateTime("now", new DateTimeZone(date_default_timezone_get()));
+
+        // месяц (аналог %B.lower())
+        $month = strtolower($now->format('F'));
+        $month_letter = $month[$keys_for_items[$subject_id]["month_position"]];
+
+        // день % 10
+        $day_div = intval($now->format('d')) % 10;
+
+        $letters = range('a', 'z');
+        $digits = range('0', '9');
+
+        // случайная буква из набора
+        $set_letter = $keys_for_items[$subject_id]["set_letter"][array_rand($keys_for_items[$subject_id]["set_letter"])];
+
+        // 2 случайные буквы
+        $other_letter = '';
+        for ($i = 0; $i < 2; $i++) {
+            $other_letter .= $letters[array_rand($letters)];
+        }
+
+        // 3 случайные цифры
+        $other_digits = '';
+        for ($i = 0; $i < 3; $i++) {
+            $other_digits .= $digits[array_rand($digits)];
+        }
+
+        $promo = $month_letter . $day_div . $other_letter . $other_digits . $set_letter;
+
+        // перемешивание строки (аналог random.sample)
+        $promo_array = str_split($promo);
+        shuffle($promo_array);
+
+        return implode('', $promo_array);
     }
 }
