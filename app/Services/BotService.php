@@ -411,10 +411,7 @@ class BotService
     }
 
     private function generatePromocodes(int $subject_id){
-        $codes = [];
-        for($i = 0; $i < 50; $i++){
-            $codes[] = $this->generate_promo($subject_id);
-        }
+        $codes = [$this->generate_promo($subject_id)];
 
         $data = [];
         $now = now();
