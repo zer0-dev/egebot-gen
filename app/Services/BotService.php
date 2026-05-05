@@ -111,17 +111,8 @@ class BotService
                 break;
             case $msg->getMessage() === 'checkout':
             case $msg->getMessage() === __('messages.buttons.shop.checkout'):
-                $cart = $user->subjects()->with(['promocodes' => function ($q) {
-                    $q->where('is_sold', 0);
-                }])->get();
+                $cart = $user->subjects()->get();
 
-                $allHaveFreePromocodes = $cart->every(function ($subject) {
-                    return $subject->promocodes->isNotEmpty();
-                });
-                if(!$allHaveFreePromocodes){
-                    $text = __('messages.shop.checkout_no_promocodes');
-                    break;
-                }
                 if(count($cart) > 0){
                     $subjects_list = $cart->pluck('name')->implode(', ');
                     $total = $cart->sum('price');
@@ -158,10 +149,6 @@ class BotService
                 break;
             case preg_match('/selectSubject\[(\d+)]/', $msg->getMessage(), $matches):
                 $subject = Subject::query()->find($matches[1]);
-                if(count($subject->promocodes()->where('is_sold', '=', '0')->get()) == 0){
-                    $text = __('messages.shop.cart_no_promocodes', ['subject' => $subject->name]);
-                    break;
-                }
                 $user->subjects()->syncWithoutDetaching($subject);
 
                 // Add data to reminders table
@@ -191,31 +178,18 @@ class BotService
                 if($order->status === 'pending'){
                     $text = __('messages.shop.order_pending');
                 } elseif($order->status === 'success') {
-                    $codes = [];
                     $subjects = $order->subjects()->get();
                     foreach ($subjects as $subject){
-                        $promocode = $subject->promocodes()->where('is_sold', '=', '0')->inRandomOrder()->first();
-                        if($promocode !== null){
-                            $codes[] = $promocode->code;
-                            $promocode->update(['is_sold' => 1]);
-                        }
-                        if($promocode === null) $codes[] = __('messages.shop.cart_no_promocodes', ['subject' => $subject->name]);
+                        $this->botApi->send_message($user, $subject->name.': '.$this->generate_promo($subject->name));
                     }
                     $this->botApi->send_message($user, __('messages.shop.order_success'));
 
-                    foreach ($codes as $code){
-                        $this->botApi->send_message($user, $code);
-                    }
                     $this->botApi->send_message($user, __('messages.shop.goodluck'), $keyboard, $is_inline, $msg->getCallbackQueryId());
 
 
                     $order->update(['status' => 'finished']);
                     $user->subjects()->detach();
 
-                    $subjectsWithLittleStock = $this->checkPromocodesStock();
-                    if(count($subjectsWithLittleStock) > 0){
-                        $this->sendMessageToAdmin(__('messages.admin.restock_needed', ['subjects' => implode("\n", $subjectsWithLittleStock)]));
-                    }
                     return;
                 } elseif ($order->status === 'finished'){
                     $text = __('messages.shop.order_finished');
@@ -341,7 +315,7 @@ class BotService
         if(preg_match('/selectSubjectUpload\[(\d+)]/', $msg->getMessage(), $matches)){
             $subject = Subject::query()->find($matches[1]);
             $text = __('messages.admin.upload_promocodes', ['subject' => $subject->name]);
-            $this->generatePromocodes(intval($matches[1]));
+            $this->generatePromocodes($subject->name);
         } else {
             $user->update(['state' => 1]);
             $text = __('messages.admin.default_message');
@@ -410,27 +384,9 @@ class BotService
         }
     }
 
-    private function generatePromocodes(int $subject_id){
-        $codes = [$this->generate_promo($subject_id)];
+    private function generatePromocodes(string $subject_name){
 
-        $data = [];
-        $now = now();
-
-        foreach ($codes as $code) {
-            $code = trim($code);
-
-            if ($code === '') continue;
-
-            $data[] = [
-                'code' => $code,
-                'subject_id' => $subject_id,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-
-        Promocode::insert($data);
-        $this->sendMessageToAdmin(__('messages.admin.upload_promocodes_success', ['amount' => count($codes)]));
+        $this->sendMessageToAdmin(__('messages.admin.upload_promocodes_success', ['code' => $this->generate_promo($subject_name)]));
     }
 
     private function sendReminder(string $message){
@@ -438,22 +394,6 @@ class BotService
         foreach ($users as $user){
             $this->sendMessageToUser($user, $message);
         }
-    }
-
-    private function checkPromocodesStock(){
-        $subjects = DB::table('subjects')
-            ->leftJoin('promocodes', function ($join) {
-                $join->on('subjects.id', '=', 'promocodes.subject_id')
-                    ->where('promocodes.is_sold', 0);
-            })
-            ->groupBy('subjects.id', 'subjects.name')
-            ->havingRaw('COUNT(promocodes.id) < 5')
-            ->get([
-                'subjects.name',
-            ]);
-        return $subjects->map(function ($e) {
-            return $e->name;
-        })->toArray();
     }
 
     public function sendMessageToUser(User $user, string $message)
@@ -472,83 +412,73 @@ class BotService
         $this->sendMessageToUser($admin_user, $message);
     }
 
-    private function generate_promo(int $subject_id) {
-        $keys_for_items = [
-            [
-                "month_position" => -1,
-                "set_letter" => []
-            ],
-            [
-                "month_position" => 0,
-                "set_letter" => ['r','u','s']
-            ],
-            [
-                "month_position" => 1,
-                "set_letter" => ['m','a','t']
-            ],
-            [
-                "month_position" => 2,
-                "set_letter" => ['o','b','s']
-            ],
-            [
-                "month_position" => 1,
-                "set_letter" => ['r','u','s']
-            ],
-            [
-                "month_position" => 2,
-                "set_letter" => ['c','h','e']
-            ],
-            [
-                "month_position" => 1,
-                "set_letter" => ['b','i','o']
-            ],
-            [
-                "month_position" => 0,
-                "set_letter" => ['l','i','t']
-            ],
-            [
-                "month_position" => 2,
-                "set_letter" => ['s','b','o']
-            ],
-            [
-                "month_position" => 0,
-                "set_letter" => ['e','n','g']
-            ]
+    private function generate_promo(string $subject_id) {
+        $ITEM_RULES = [
+            "Русский язык"   => ["month_position" => 0, "set_letters" => ['R', 'Y']],
+            "Математика"  => ["month_position" => 1, "set_letters" => ['M', 'A']],
+            "Обществознание"   => ["month_position" => 2, "set_letters" => ['S', 'O']],
+            "История"  => ["month_position" => 1, "set_letters" => ['H', 'I']],
+            "Химия"  => ["month_position" => 2, "set_letters" => ['X', 'Z']],
+            "Биология"   => ["month_position" => 1, "set_letters" => ['B', 'G']],
+            "Литература" => ["month_position" => 0, "set_letters" => ['L', 'T']],
+            "Физика"  => ["month_position" => 2, "set_letters" => ['P', 'C']],
+            "Английский язык"   => ["month_position" => 0, "set_letters" => ['E', 'N']],
         ];
-        // текущая дата
-        $now = new DateTime("now", new DateTimeZone(date_default_timezone_get()));
 
-        // месяц (аналог %B.lower())
-        $month = strtolower($now->format('F'));
-        $month_letter = $month[$keys_for_items[$subject_id]["month_position"]];
-
-        // день % 10
-        $day_div = intval($now->format('d')) % 10;
-
-        $letters = range('a', 'z');
-        $digits = range('0', '9');
-
-        // случайная буква из набора
-        $set_letter = $keys_for_items[$subject_id]["set_letter"][array_rand($keys_for_items[$subject_id]["set_letter"])];
-
-        // 2 случайные буквы
-        $other_letter = '';
-        for ($i = 0; $i < 2; $i++) {
-            $other_letter .= $letters[array_rand($letters)];
+        $ALL_SUBJECT_LETTERS = [];
+        foreach ($ITEM_RULES as $rule) {
+            foreach ($rule["set_letters"] as $c) {
+                $ALL_SUBJECT_LETTERS[strtoupper($c)] = true;
+            }
         }
 
-        // 3 случайные цифры
-        $other_digits = '';
-        for ($i = 0; $i < 3; $i++) {
-            $other_digits .= $digits[array_rand($digits)];
+        $now = new DateTime("now");
+
+        // цифра дня
+        $day_digit = (string)((int)$now->format('j') % 10);
+
+        // буква месяца
+        $pos = $ITEM_RULES[$subject_id]["month_position"];
+        $month_name = strtolower($now->format('F'));
+
+        if ($pos >= strlen($month_name)) {
+            $pos = 0;
         }
 
-        $promo = $month_letter . $day_div . $other_letter . $other_digits . $set_letter;
+        $month_letter = strtoupper($month_name[$pos]);
 
-        // перемешивание строки (аналог random.sample)
-        $promo_array = str_split($promo);
-        shuffle($promo_array);
+        // предметная буква
+        $letters = $ITEM_RULES[$subject_id]["set_letters"];
+        $subj_letter = strtoupper($letters[array_rand($letters)]);
 
-        return implode('', $promo_array);
+        // запрещённые символы
+        $forbidden = $ALL_SUBJECT_LETTERS;
+        $forbidden[$subj_letter] = true;
+        $forbidden[$month_letter] = true;
+
+        // безопасные буквы
+        $safe_letters = [];
+        foreach (range('A', 'Z') as $c) {
+            if (!isset($forbidden[$c])) {
+                $safe_letters[] = $c;
+            }
+        }
+
+        // сборка
+        $chars = [
+            $day_digit,
+            $month_letter,
+            $subj_letter,
+            (string)random_int(0, 9)
+        ];
+
+        for ($i = 0; $i < 8; $i++) {
+            $chars[] = $safe_letters[array_rand($safe_letters)];
+        }
+
+        // перемешивание
+        shuffle($chars);
+
+        return implode('', $chars);
     }
 }

@@ -16,14 +16,14 @@ return [
         'upload_promocodes_fail' => 'Введите количество генерируемых кодов',
         'upload_promocodes_select' => 'Выберите предмет, для которого будем генерировать промокоды',
         'upload_promocodes_start' => 'Начата загрузка промокодов в базу',
-        'upload_promocodes_success' => 'Промокоды загружены в базу: :amount шт.',
+        'upload_promocodes_success' => 'Промокод: :code',
     ],
     'buttons' => [
         'admin' => [
             'change_price' => 'Изменить цену всех промокодов',
             'everyone' => 'Отправить сообщение всем',
             'reminder' => 'Напоминалка для тех, кто не купил',
-            'upload_promocodes' => 'Сгенерировать промокоды',
+            'upload_promocodes' => 'Сгенерировать промокод',
         ],
         'shop' => [
             'checkout' => 'Оплатить корзину',

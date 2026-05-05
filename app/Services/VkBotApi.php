@@ -53,12 +53,23 @@ class VkBotApi implements IBotApi
         if($callback_query_id != null) $this->api_call('messages.sendMessageEventAnswer', ['event_id' => $callback_query_id, 'user_id' => $user->uid, 'peer_id' => $user->uid]);
     }
 
-    /**
-     * @throws ConnectionException
-     */
-    public function api_call(string $method, array $params): PromiseInterface|Response
+    public function api_call(string $method, array $params)
     {
-        return Http::withHeader('Authorization', 'Bearer '.$this->token)->post('https://api.vk.com/method/'.$method.'?'.http_build_query($params).'&v=5.199');
+//        return Http::withHeader('Authorization', 'Bearer '.$this->token)->post('https://api.vk.com/method/'.$method.'?'.http_build_query($params).'&v=5.199');
+        $url = 'https://api.vk.com/method/'.$method.'?'.http_build_query($params + ['v' => '5.199']);
+
+        $ch = curl_init($url);
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->token,
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        curl_close($ch);
+        return $response;
     }
 
     public function make_keyboard(array $buttons, bool $is_inline): string
